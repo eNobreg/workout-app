@@ -17,9 +17,35 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
   void initState() {
     super.initState();
     // Load profiles when the screen initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().loadProfiles();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final profileProvider = context.read<ProfileProvider>();
+      await profileProvider.loadProfiles();
+      
+      // Auto-navigate if there's a restored active profile
+      if (mounted && profileProvider.activeProfile != null) {
+        await _loadDataAndNavigate(profileProvider.activeProfile!);
+      }
     });
+  }
+
+  /// Loads profile data and navigates to home screen.
+  Future<void> _loadDataAndNavigate(Profile profile) async {
+    final exerciseProvider = context.read<ExerciseProvider>();
+    final workoutProvider = context.read<WorkoutProvider>();
+    final sessionProvider = context.read<SessionProvider>();
+
+    await exerciseProvider.loadExercises(profile.id);
+    if (!mounted) return;
+
+    await workoutProvider.loadWorkouts(profile.id);
+    if (!mounted) return;
+
+    await sessionProvider.loadSessions(profile.id);
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
   }
 
   Future<void> _createProfile() async {
@@ -60,26 +86,9 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
 
   Future<void> _selectProfile(Profile profile) async {
     final profileProvider = context.read<ProfileProvider>();
-    final exerciseProvider = context.read<ExerciseProvider>();
-    final workoutProvider = context.read<WorkoutProvider>();
-    final sessionProvider = context.read<SessionProvider>();
-
     await profileProvider.setActiveProfile(profile);
     if (!mounted) return;
-
-    // Load data for the selected profile
-    await exerciseProvider.loadExercises(profile.id);
-    if (!mounted) return;
-
-    await workoutProvider.loadWorkouts(profile.id);
-    if (!mounted) return;
-
-    await sessionProvider.loadSessions(profile.id);
-    if (!mounted) return;
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    await _loadDataAndNavigate(profile);
   }
 
   @override
