@@ -8,6 +8,7 @@ import 'rotation_setup_screen.dart';
 import 'workout_history_screen.dart';
 import 'session_details_screen.dart';
 import 'exercise_history_screen.dart';
+import 'profile_screen.dart';
 
 /// Main home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
@@ -48,8 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: const [
           _TodayTab(),
           _WorkoutsTab(),
-          _ExercisesTab(),
           _HistoryTab(),
+          _ProfileTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -61,9 +62,9 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.today_outlined),
-            selectedIcon: Icon(Icons.today),
-            label: 'Today',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),
@@ -71,14 +72,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Workouts',
           ),
           NavigationDestination(
-            icon: Icon(Icons.list_outlined),
-            selectedIcon: Icon(Icons.list),
-            label: 'Exercises',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'History',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),
@@ -88,13 +89,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String _getTitle() {
     switch (_currentIndex) {
       case 0:
-        return 'Today';
+        return 'Home';
       case 1:
         return 'Workouts';
       case 2:
-        return 'Exercises';
-      case 3:
         return 'History';
+      case 3:
+        return 'Profile';
       default:
         return 'Workout Tracker';
     }
@@ -967,5 +968,16 @@ class _HistoryTabState extends State<_HistoryTab> {
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'PM' : 'AM';
     return '$hour:${date.minute.toString().padLeft(2, '0')} $period';
+  }
+}
+
+/// Profile tab - embedded profile screen.
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab();
+
+  @override
+  Widget build(BuildContext context) {
+    // Return the ProfileScreen content without app bar
+    return const ProfileScreen(showAppBar: false);
   }
 }
