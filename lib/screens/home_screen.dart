@@ -4,6 +4,7 @@ import '../main.dart';
 import '../providers/providers.dart';
 import 'workout_detail_screen.dart';
 import 'active_workout_screen.dart';
+import 'rotation_setup_screen.dart';
 import 'workout_history_screen.dart';
 import 'session_details_screen.dart';
 import 'exercise_history_screen.dart';
@@ -104,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<ExerciseProvider>().clear();
     context.read<WorkoutProvider>().clear();
     context.read<SessionProvider>().clear();
+    context.read<RotationProvider>().clear();
     await context.read<ProfileProvider>().setActiveProfile(null);
 
     if (mounted) {
@@ -120,6 +122,8 @@ class _TodayTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>().activeProfile;
     final activeSession = context.watch<SessionProvider>().activeSession;
+    final rotationProvider = context.watch<RotationProvider>();
+    final workoutProvider = context.watch<WorkoutProvider>();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -137,6 +141,10 @@ class _TodayTab extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 24),
+
+          // Rotation display
+          _buildRotationCard(context, rotationProvider, workoutProvider),
+          const SizedBox(height: 16),
 
           // Active session card
           if (activeSession != null) ...[
@@ -272,6 +280,94 @@ class _TodayTab extends StatelessWidget {
     } else {
       return 'Good evening! Let\'s get moving!';
     }
+  }
+
+  Widget _buildRotationCard(
+    BuildContext context,
+    RotationProvider rotationProvider,
+    WorkoutProvider workoutProvider,
+  ) {
+    final currentDay = rotationProvider.currentRotationDay;
+    final rotationLength = rotationProvider.rotationLength;
+
+    // No rotation set up
+    if (rotationLength == 0) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.rotate_right),
+          title: const Text('Set Up Rotation'),
+          subtitle: const Text('Create a workout cycle (e.g., Push/Pull/Legs)'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _navigateToRotationSetup(context),
+        ),
+      );
+    }
+
+    // Rotation is set up - show current day
+    final workout = currentDay?.workoutId != null
+        ? workoutProvider.workouts
+            .where((w) => w.id == currentDay!.workoutId)
+            .firstOrNull
+        : null;
+
+    final dayLabel = currentDay?.isRestDay == true
+        ? 'Rest Day'
+        : (workout?.name ?? 'Workout Day');
+
+    return Card(
+      color: currentDay?.isRestDay == true
+          ? Theme.of(context).colorScheme.secondaryContainer
+          : Theme.of(context).colorScheme.primaryContainer,
+      child: InkWell(
+        onTap: () => _navigateToRotationSetup(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                child: Text(
+                  '${rotationProvider.currentDay}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Day ${rotationProvider.currentDay}: $dayLabel',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '$rotationLength-day rotation cycle',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.edit_outlined),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToRotationSetup(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const RotationSetupScreen(),
+      ),
+    );
   }
 
   Future<void> _startQuickWorkout(BuildContext context) async {

@@ -10,6 +10,7 @@ class Routes {
   static const String profileSelection = '/';
   static const String home = '/home';
   static const String activeWorkout = '/active_workout';
+  static const String rotationSetup = '/rotation_setup';
   static const String workoutHistory = '/workout_history';
   static const String sessionDetails = '/session_details';
   static const String exerciseHistory = '/exercise_history';
@@ -32,6 +33,7 @@ class WorkoutTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExerciseProvider()),
         ChangeNotifierProvider(create: (_) => WorkoutProvider()),
         ChangeNotifierProvider(create: (_) => SessionProvider()),
+        ChangeNotifierProvider(create: (_) => RotationProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
       ],
       child: MaterialApp(
@@ -45,6 +47,7 @@ class WorkoutTrackerApp extends StatelessWidget {
           Routes.profileSelection: (_) => const ProfileSelectionScreen(),
           Routes.home: (_) => const HomeScreen(),
           Routes.activeWorkout: (_) => const ActiveWorkoutScreen(),
+          Routes.rotationSetup: (_) => const RotationSetupScreen(),
           Routes.workoutHistory: (_) => const WorkoutHistoryScreen(),
         },
       ),
