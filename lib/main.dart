@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app_theme.dart';
 import 'providers/providers.dart';
+import 'providers/history_provider.dart';
 import 'screens/screens.dart';
 
 /// Named routes for navigation.
@@ -9,6 +10,9 @@ class Routes {
   static const String profileSelection = '/';
   static const String home = '/home';
   static const String activeWorkout = '/active_workout';
+  static const String workoutHistory = '/workout_history';
+  static const String sessionDetails = '/session_details';
+  static const String exerciseHistory = '/exercise_history';
 }
 
 void main() {
@@ -28,6 +32,7 @@ class WorkoutTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExerciseProvider()),
         ChangeNotifierProvider(create: (_) => WorkoutProvider()),
         ChangeNotifierProvider(create: (_) => SessionProvider()),
+        ChangeNotifierProvider(create: (_) => HistoryProvider()),
       ],
       child: MaterialApp(
         title: 'Workout Tracker',
@@ -40,6 +45,7 @@ class WorkoutTrackerApp extends StatelessWidget {
           Routes.profileSelection: (_) => const ProfileSelectionScreen(),
           Routes.home: (_) => const HomeScreen(),
           Routes.activeWorkout: (_) => const ActiveWorkoutScreen(),
+          Routes.workoutHistory: (_) => const WorkoutHistoryScreen(),
         },
       ),
     );
