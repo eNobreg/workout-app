@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../main.dart';
 import '../providers/providers.dart';
 import 'workout_detail_screen.dart';
+import 'active_workout_screen.dart';
 
 /// Main home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
@@ -163,7 +164,11 @@ class _TodayTab extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          // TODO: Navigate to active session screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ActiveWorkoutScreen(),
+                            ),
+                          );
                         },
                         child: const Text('Continue Workout'),
                       ),
@@ -189,9 +194,7 @@ class _TodayTab extends StatelessWidget {
               title: const Text('Quick Workout'),
               subtitle: const Text('Start an empty workout session'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // TODO: Start quick workout
-              },
+              onTap: () => _startQuickWorkout(context),
             ),
           ),
           const SizedBox(height: 24),
@@ -245,9 +248,7 @@ class _TodayTab extends StatelessWidget {
                               ? Text(workout.description!)
                               : null,
                           trailing: const Icon(Icons.play_arrow),
-                          onTap: () {
-                            // TODO: Start workout
-                          },
+                          onTap: () => _startWorkout(context, workout),
                         ),
                       )),
                 ],
@@ -267,6 +268,33 @@ class _TodayTab extends StatelessWidget {
       return 'Good afternoon! Time to train?';
     } else {
       return 'Good evening! Let\'s get moving!';
+    }
+  }
+
+  Future<void> _startQuickWorkout(BuildContext context) async {
+    final sessionProvider = context.read<SessionProvider>();
+    await sessionProvider.startSession();
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const ActiveWorkoutScreen(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _startWorkout(BuildContext context, dynamic workout) async {
+    final sessionProvider = context.read<SessionProvider>();
+    await sessionProvider.startSession(
+      workoutId: workout.id,
+      workoutName: workout.name,
+    );
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const ActiveWorkoutScreen(),
+        ),
+      );
     }
   }
 }
