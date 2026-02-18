@@ -5,6 +5,9 @@ import '../providers/providers.dart';
 import 'workout_detail_screen.dart';
 import 'active_workout_screen.dart';
 import 'rotation_setup_screen.dart';
+import 'workout_history_screen.dart';
+import 'session_details_screen.dart';
+import 'exercise_history_screen.dart';
 
 /// Main home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
@@ -564,16 +567,29 @@ class _ExercisesTab extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  leading: const Icon(Icons.fitness_center),
                   title: Text(exercise.name),
                   subtitle:
                       exercise.notes != null ? Text(exercise.notes!) : null,
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
-                      if (value == 'delete') {
+                      if (value == 'history') {
+                        _navigateToExerciseHistory(context, exercise);
+                      } else if (value == 'delete') {
                         _confirmDeleteExercise(context, exercise);
                       }
                     },
                     itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'history',
+                        child: Row(
+                          children: [
+                            Icon(Icons.show_chart),
+                            SizedBox(width: 8),
+                            Text('View History'),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'delete',
                         child: Row(
@@ -587,6 +603,7 @@ class _ExercisesTab extends StatelessWidget {
                       ),
                     ],
                   ),
+                  onTap: () => _navigateToExerciseHistory(context, exercise),
                 ),
               );
             },
@@ -662,6 +679,14 @@ class _ExercisesTab extends StatelessWidget {
     }
   }
 
+  void _navigateToExerciseHistory(BuildContext context, dynamic exercise) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ExerciseHistoryScreen(exercise: exercise),
+      ),
+    );
+  }
+
   Future<void> _confirmDeleteExercise(
       BuildContext context, dynamic exercise) async {
     final confirmed = await showDialog<bool>(
@@ -690,58 +715,128 @@ class _ExercisesTab extends StatelessWidget {
 }
 
 /// History tab - view past workouts.
-class _HistoryTab extends StatelessWidget {
+class _HistoryTab extends StatefulWidget {
   const _HistoryTab();
 
   @override
+  State<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<_HistoryTab> {
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final profileId = context.read<ProfileProvider>().activeProfile?.id;
+    if (profileId != null) {
+      await context.read<HistoryProvider>().loadAllSessions(profileId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer<SessionProvider>(
-      builder: (context, sessionProvider, child) {
-        if (sessionProvider.isLoading) {
+    final theme = Theme.of(context);
+
+    return Consumer<HistoryProvider>(
+      builder: (context, historyProvider, child) {
+        if (historyProvider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final sessions = sessionProvider.sessions
-            .where((s) => !s.isInProgress)
-            .toList();
+        final sessions = historyProvider.completedSessions;
 
-        if (sessions.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.history,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: 16),
-                const Text('No workout history yet'),
-                const SizedBox(height: 8),
-                const Text('Complete a workout to see it here'),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: sessions.length,
-          itemBuilder: (context, index) {
-            final session = sessions[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.check_circle),
-                title: Text(session.workoutName ?? 'Workout'),
-                subtitle: Text(_formatDate(session.startedAt)),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Navigate to session detail
-                },
+        return Column(
+          children: [
+            // Header with "View All" button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent Workouts',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const WorkoutHistoryScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('View All'),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+
+            // Sessions list
+            Expanded(
+              child: sessions.isEmpty
+                  ? _buildEmptyState(theme)
+                  : _buildSessionsList(theme, sessions),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.history,
+            size: 80,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          const Text('No workout history yet'),
+          const SizedBox(height: 8),
+          const Text('Complete a workout to see it here'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionsList(ThemeData theme, List<dynamic> sessions) {
+    // Show only the 10 most recent sessions
+    final recentSessions = sessions.take(10).toList();
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: recentSessions.length,
+      itemBuilder: (context, index) {
+        final session = recentSessions[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Icon(
+                Icons.check_circle,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            title: Text(session.workoutName ?? 'Quick Workout'),
+            subtitle: Text(_formatDate(session.startedAt)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SessionDetailsScreen(sessionId: session.id),
+                ),
+              );
+            },
+          ),
         );
       },
     );

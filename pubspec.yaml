@@ -49,6 +49,9 @@ dependencies:
   # Date/time utilities
   intl: ^0.19.0
   
+  # Calendar widget
+  table_calendar: ^3.1.2
+  
   # UUID generation for unique IDs
   uuid: ^4.3.3
   shared_preferences: ^2.2.2
