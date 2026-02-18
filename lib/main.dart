@@ -8,6 +8,7 @@ import 'screens/screens.dart';
 class Routes {
   static const String profileSelection = '/';
   static const String home = '/home';
+  static const String activeWorkout = '/active_workout';
 }
 
 void main() {
@@ -38,6 +39,7 @@ class WorkoutTrackerApp extends StatelessWidget {
         routes: {
           Routes.profileSelection: (_) => const ProfileSelectionScreen(),
           Routes.home: (_) => const HomeScreen(),
+          Routes.activeWorkout: (_) => const ActiveWorkoutScreen(),
         },
       ),
     );
