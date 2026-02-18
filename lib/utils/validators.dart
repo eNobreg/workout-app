@@ -26,9 +26,6 @@ String? validateWeight(String? value, {bool required = true}) {
   if (weight < 0) {
     return 'Weight cannot be negative';
   }
-  if (required && weight <= 0) {
-    return 'Weight must be > 0';
-  }
   return null;
 }
 

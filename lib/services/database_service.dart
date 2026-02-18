@@ -8,7 +8,7 @@ import '../models/models.dart';
 /// Handles all SQLite database operations using sqflite.
 class DatabaseService {
   static const String _databaseName = 'workout_tracker.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 4;
 
   // Singleton instance
   static DatabaseService? _instance;
@@ -60,6 +60,9 @@ class DatabaseService {
         profile_id TEXT NOT NULL,
         name TEXT NOT NULL,
         notes TEXT,
+        default_sets INTEGER NOT NULL DEFAULT 3,
+        default_reps INTEGER NOT NULL DEFAULT 10,
+        default_weight REAL NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
       )
@@ -102,6 +105,20 @@ class DatabaseService {
         created_at TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Rotation progress table (tracks current position in the active schedule)
+    await db.execute('''
+      CREATE TABLE rotation_progress (
+        profile_id TEXT PRIMARY KEY,
+        schedule_id TEXT NOT NULL,
+        current_day INTEGER NOT NULL DEFAULT 1,
+        last_completed_day INTEGER,
+        last_completed_at TEXT,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+        FOREIGN KEY (schedule_id) REFERENCES rotation_schedules (id) ON DELETE CASCADE
       )
     ''');
 
@@ -174,6 +191,8 @@ class DatabaseService {
     await db.execute(
         'CREATE INDEX idx_rotation_days_schedule ON rotation_days (schedule_id)');
     await db.execute(
+        'CREATE INDEX idx_rotation_progress_schedule ON rotation_progress (schedule_id)');
+    await db.execute(
         'CREATE INDEX idx_workout_sessions_profile ON workout_sessions (profile_id)');
     await db.execute(
         'CREATE INDEX idx_workout_sessions_date ON workout_sessions (started_at)');
@@ -187,7 +206,49 @@ class DatabaseService {
 
   /// Handles database upgrades.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle future migrations here
+    // Migration from v1 to v2: Add quick_workout_templates table
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quick_workout_templates (
+          id TEXT PRIMARY KEY,
+          profile_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          exerciseIds TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_quick_workout_templates_profile ON quick_workout_templates (profile_id)');
+    }
+
+    // Migration from v2 to v3: Add default set scheme fields to exercises
+    if (oldVersion < 3) {
+      await db.execute(
+          'ALTER TABLE exercises ADD COLUMN default_sets INTEGER NOT NULL DEFAULT 3');
+      await db.execute(
+          'ALTER TABLE exercises ADD COLUMN default_reps INTEGER NOT NULL DEFAULT 10');
+      await db.execute(
+          'ALTER TABLE exercises ADD COLUMN default_weight REAL NOT NULL DEFAULT 0');
+    }
+
+    // Migration from v3 to v4: Add rotation_progress table
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS rotation_progress (
+          profile_id TEXT PRIMARY KEY,
+          schedule_id TEXT NOT NULL,
+          current_day INTEGER NOT NULL DEFAULT 1,
+          last_completed_day INTEGER,
+          last_completed_at TEXT,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+          FOREIGN KEY (schedule_id) REFERENCES rotation_schedules (id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_rotation_progress_schedule ON rotation_progress (schedule_id)');
+    }
   }
 
   // ============== Profile Operations ==============
@@ -465,6 +526,39 @@ class DatabaseService {
       orderBy: 'day_number ASC',
     );
     return maps.map((map) => RotationDay.fromMap(map)).toList();
+  }
+
+  /// Gets rotation progress for a profile.
+  Future<RotationProgress?> getRotationProgress(String profileId) async {
+    final db = await database;
+    final maps = await db.query(
+      'rotation_progress',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return RotationProgress.fromMap(maps.first);
+  }
+
+  /// Inserts or updates rotation progress for a profile.
+  Future<void> upsertRotationProgress(RotationProgress progress) async {
+    final db = await database;
+    await db.insert(
+      'rotation_progress',
+      progress.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Deletes rotation progress for a profile.
+  Future<void> deleteRotationProgress(String profileId) async {
+    final db = await database;
+    await db.delete(
+      'rotation_progress',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+    );
   }
 
   // ============== Workout Session Operations ==============

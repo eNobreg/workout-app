@@ -7,6 +7,7 @@ class RotationProvider extends ChangeNotifier {
   final RotationRepository _repository = RotationRepository();
 
   RotationSchedule? _activeSchedule;
+  RotationProgress? _progress;
   List<RotationDay> _rotationDays = [];
   int _currentDay = 1;
   bool _isLoading = false;
@@ -20,6 +21,9 @@ class RotationProvider extends ChangeNotifier {
 
   /// The current day in the rotation cycle (1-indexed).
   int get currentDay => _currentDay;
+
+  /// Persisted rotation progress for the active schedule.
+  RotationProgress? get progress => _progress;
 
   /// The total length of the rotation cycle.
   int get rotationLength => _rotationDays.length;
@@ -45,7 +49,39 @@ class RotationProvider extends ChangeNotifier {
     try {
       _activeSchedule = await _repository.loadRotationByUser(profileId);
       _rotationDays = _activeSchedule?.days ?? [];
-      _currentDay = 1;
+
+      if (_activeSchedule == null || _rotationDays.isEmpty) {
+        _progress = null;
+        _currentDay = 1;
+        return;
+      }
+
+      final scheduleId = _activeSchedule!.id;
+      final now = DateTime.now();
+
+      var progress = await _repository.getRotationProgress(profileId);
+
+      // Reset progress if schedule changed or progress missing
+      if (progress == null || progress.scheduleId != scheduleId) {
+        progress = RotationProgress(
+          profileId: profileId,
+          scheduleId: scheduleId,
+          currentDay: 1,
+          updatedAt: now,
+        );
+        await _repository.upsertRotationProgress(progress);
+      }
+
+      // Clamp current day if rotation length changed
+      var clampedDay = progress.currentDay;
+      if (clampedDay < 1 || clampedDay > _rotationDays.length) {
+        clampedDay = 1;
+        progress = progress.copyWith(currentDay: clampedDay, updatedAt: now);
+        await _repository.upsertRotationProgress(progress);
+      }
+
+      _progress = progress;
+      _currentDay = clampedDay;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -63,9 +99,23 @@ class RotationProvider extends ChangeNotifier {
       name,
     );
 
+    // New schedule => reset persisted progress
+    await _repository.deleteRotationProgress(_currentProfileId!);
+
     _activeSchedule = schedule;
     _rotationDays = [];
     _currentDay = 1;
+
+    // Seed progress (even if days are added later)
+    final now = DateTime.now();
+    _progress = RotationProgress(
+      profileId: _currentProfileId!,
+      scheduleId: schedule.id,
+      currentDay: 1,
+      updatedAt: now,
+    );
+    await _repository.upsertRotationProgress(_progress!);
+
     notifyListeners();
 
     return schedule;
@@ -90,6 +140,12 @@ class RotationProvider extends ChangeNotifier {
 
     _rotationDays.add(day);
     _updateScheduleDays();
+
+    // Ensure progress exists once rotation has at least one day.
+    if (_currentProfileId != null && _progress == null) {
+      await _persistProgress();
+    }
+
     notifyListeners();
 
     return day;
@@ -168,18 +224,82 @@ class RotationProvider extends ChangeNotifier {
   }
 
   /// Manually sets the current day.
-  void setCurrentDay(int dayNumber) {
+  Future<void> setCurrentDay(int dayNumber) async {
     if (dayNumber >= 1 && dayNumber <= _rotationDays.length) {
       _currentDay = dayNumber;
+      await _persistProgress();
       notifyListeners();
     }
   }
 
   /// Advances to the next day in the rotation.
-  void advanceDay() {
+  Future<void> advanceDay() async {
     if (_rotationDays.isEmpty) return;
     _currentDay = (_currentDay % _rotationDays.length) + 1;
+    await _persistProgress();
     notifyListeners();
+  }
+
+  /// Marks the current rotation day as completed and advances to the next day.
+  ///
+  /// This only applies when the completed workout matches the workout assigned to
+  /// the current rotation day.
+  Future<void> completeCurrentDayForWorkout({
+    required String workoutId,
+    DateTime? completedAt,
+  }) async {
+    if (_currentProfileId == null || _activeSchedule == null) return;
+    if (_rotationDays.isEmpty) return;
+
+    final current = currentRotationDay;
+    if (current == null) return;
+    if (current.isRestDay) return;
+    if (current.workoutId == null) return;
+    if (current.workoutId != workoutId) return;
+
+    final now = completedAt ?? DateTime.now();
+
+    final nextDay = (_currentDay % _rotationDays.length) + 1;
+    final progress = (_progress == null || _progress!.scheduleId != _activeSchedule!.id)
+        ? RotationProgress(
+            profileId: _currentProfileId!,
+            scheduleId: _activeSchedule!.id,
+            currentDay: nextDay,
+            lastCompletedDay: _currentDay,
+            lastCompletedAt: now,
+            updatedAt: DateTime.now(),
+          )
+        : _progress!.copyWith(
+            currentDay: nextDay,
+            lastCompletedDay: _currentDay,
+            lastCompletedAt: now,
+            updatedAt: DateTime.now(),
+          );
+
+    await _repository.upsertRotationProgress(progress);
+    _progress = progress;
+    _currentDay = nextDay;
+    notifyListeners();
+  }
+
+  Future<void> _persistProgress() async {
+    if (_currentProfileId == null || _activeSchedule == null) return;
+
+    final now = DateTime.now();
+    final progress = (_progress == null || _progress!.scheduleId != _activeSchedule!.id)
+        ? RotationProgress(
+            profileId: _currentProfileId!,
+            scheduleId: _activeSchedule!.id,
+            currentDay: _currentDay,
+            updatedAt: now,
+          )
+        : _progress!.copyWith(
+            currentDay: _currentDay,
+            updatedAt: now,
+          );
+
+    await _repository.upsertRotationProgress(progress);
+    _progress = progress;
   }
 
   /// Deletes the active rotation schedule.
@@ -187,7 +307,11 @@ class RotationProvider extends ChangeNotifier {
     if (_activeSchedule == null) return;
 
     await _repository.deleteRotationSchedule(_activeSchedule!.id);
+    if (_currentProfileId != null) {
+      await _repository.deleteRotationProgress(_currentProfileId!);
+    }
     _activeSchedule = null;
+    _progress = null;
     _rotationDays = [];
     _currentDay = 1;
     notifyListeners();
@@ -203,6 +327,7 @@ class RotationProvider extends ChangeNotifier {
   /// Clears rotation data (when switching profiles).
   void clear() {
     _activeSchedule = null;
+    _progress = null;
     _rotationDays = [];
     _currentDay = 1;
     _currentProfileId = null;

@@ -55,6 +55,7 @@ dependencies:
   # UUID generation for unique IDs
   uuid: ^4.3.3
   shared_preferences: ^2.2.2
+  flex_color_scheme: ^8.4.0
 
 dev_dependencies:
   flutter_test:

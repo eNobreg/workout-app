@@ -133,6 +133,12 @@ class _ExerciseLogCardState extends State<ExerciseLogCard> {
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: SetInputCard(
+                  initialWeight: widget.loggedSets.isNotEmpty
+                      ? (widget.loggedSets.last.weight ?? widget.exercise.defaultWeight)
+                      : widget.exercise.defaultWeight,
+                  initialReps: widget.loggedSets.isNotEmpty
+                      ? (widget.loggedSets.last.reps ?? widget.exercise.defaultReps)
+                      : widget.exercise.defaultReps,
                   saveButtonText: 'Add Set',
                   showCancelButton: true,
                   onSave: (weight, reps) {

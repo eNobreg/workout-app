@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
 import '../widgets/rotation_day_dialog.dart';
+import '../widgets/rotation_days_input_dialog.dart';
+import '../widgets/rotation_day_grid_box.dart';
 
 /// Screen for setting up and managing rotation schedules.
 class RotationSetupScreen extends StatefulWidget {
@@ -28,12 +30,147 @@ class _RotationSetupScreenState extends State<RotationSetupScreen> {
     }
   }
 
+  Future<void> _showDaysInputDialog() async {
+    final days = await showDialog<int>(
+      context: context,
+      builder: (context) => const RotationDaysInputDialog(),
+    );
+
+    if (days != null) {
+      await _createRotationDays(days);
+    }
+  }
+
+  Future<void> _createRotationDays(int count) async {
+    final rotationProvider = context.read<RotationProvider>();
+    for (int i = 0; i < count; i++) {
+      await rotationProvider.addRotationDay(isRestDay: true);
+    }
+    setState(() => _hasChanges = true);
+  }
+
+  Future<void> _showChangeDaysDialog() async {
+    final rotationProvider = context.read<RotationProvider>();
+    final currentDays = rotationProvider.rotationDays.length;
+
+    final newDays = await showDialog<int>(
+      context: context,
+      builder: (context) => RotationDaysInputDialog(
+        initialDays: currentDays,
+      ),
+    );
+
+    if (newDays != null && newDays != currentDays) {
+      await _adjustRotationDays(newDays, currentDays);
+    }
+  }
+
+  Future<void> _adjustRotationDays(int newCount, int currentCount) async {
+    final rotationProvider = context.read<RotationProvider>();
+
+    if (newCount > currentCount) {
+      // Add days
+      for (int i = 0; i < newCount - currentCount; i++) {
+        await rotationProvider.addRotationDay(isRestDay: true);
+      }
+    } else if (newCount < currentCount) {
+      // Remove days from the end
+      final daysToRemove = rotationProvider.rotationDays.skip(newCount).toList();
+      for (final day in daysToRemove) {
+        await rotationProvider.deleteRotationDay(day.id);
+      }
+    }
+
+    setState(() => _hasChanges = true);
+  }
+
+  Future<void> _showSetCurrentDayDialog(
+    RotationProvider rotationProvider,
+    WorkoutProvider workoutProvider,
+  ) async {
+    if (rotationProvider.rotationDays.isEmpty) return;
+
+    final workoutNameById = {
+      for (final w in workoutProvider.workouts) w.id: w.name,
+    };
+
+    final initialDay = rotationProvider.currentDay.clamp(
+      1,
+      rotationProvider.rotationDays.length,
+    );
+
+    final selectedDay = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        var tempDay = initialDay;
+
+        return AlertDialog(
+          title: const Text('Set Current Rotation Day'),
+          content: DropdownButtonFormField<int>(
+            initialValue: tempDay,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Current day',
+            ),
+            items: rotationProvider.rotationDays.map((day) {
+              final label = day.isRestDay
+                  ? 'Day ${day.dayNumber} — Rest'
+                  : 'Day ${day.dayNumber} — ${workoutNameById[day.workoutId] ?? 'Workout'}';
+              return DropdownMenuItem(
+                value: day.dayNumber,
+                child: Text(label),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              tempDay = value;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, tempDay),
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedDay == null) return;
+
+    await rotationProvider.setCurrentDay(selectedDay);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Rotation set to Day $selectedDay')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rotation Setup'),
         actions: [
+          Consumer2<RotationProvider, WorkoutProvider>(
+            builder: (context, rotationProvider, workoutProvider, child) {
+              final canSetDay = rotationProvider.rotationDays.isNotEmpty;
+              return IconButton(
+                icon: const Icon(Icons.edit_calendar),
+                tooltip: 'Set current day',
+                onPressed: canSetDay
+                    ? () => _showSetCurrentDayDialog(
+                          rotationProvider,
+                          workoutProvider,
+                        )
+                    : null,
+              );
+            },
+          ),
           if (_hasChanges)
             TextButton(
               onPressed: _saveAndExit,
@@ -72,14 +209,14 @@ class _RotationSetupScreenState extends State<RotationSetupScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Create a rotation cycle by adding days.\nExample: Push, Pull, Legs, Rest',
+                      'Set up a rotation cycle for your workout split',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: () => _addDay(context, rotationProvider, workouts),
+                      onPressed: _showDaysInputDialog,
                       icon: const Icon(Icons.add),
-                      label: const Text('Add First Day'),
+                      label: const Text('Set Up Rotation'),
                     ),
                   ],
                 ),
@@ -112,142 +249,68 @@ class _RotationSetupScreenState extends State<RotationSetupScreen> {
                             ),
                           ),
                           Text(
+                            'Tap boxes to set workouts or rest days',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
                             'Current: Day ${rotationProvider.currentDay}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: _showChangeDaysDialog,
+                      tooltip: 'Change number of days',
+                    ),
                   ],
                 ),
               ),
 
-              // Days list
+              // Days grid
               Expanded(
-                child: ReorderableListView.builder(
+                child: Padding(
                   padding: const EdgeInsets.all(16),
-                  itemCount: days.length,
-                  onReorder: (oldIndex, newIndex) =>
-                      _reorderDays(context, rotationProvider, oldIndex, newIndex),
-                  itemBuilder: (context, index) {
-                    final day = days[index];
-                    final workout = day.workoutId != null
-                        ? workouts.where((w) => w.id == day.workoutId).firstOrNull
-                        : null;
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.1,
+                    ),
+                    itemCount: days.length,
+                    itemBuilder: (context, index) {
+                      final day = days[index];
+                      final workout = day.workoutId != null
+                          ? workouts.where((w) => w.id == day.workoutId).firstOrNull
+                          : null;
 
-                    return Dismissible(
-                      key: ValueKey(day.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      confirmDismiss: (_) => _confirmDelete(context, day),
-                      onDismissed: (_) =>
-                          _deleteDay(context, rotationProvider, day.id),
-                      child: Card(
-                        key: ValueKey('card_${day.id}'),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: day.isRestDay
-                                ? Theme.of(context).colorScheme.secondaryContainer
-                                : Theme.of(context).colorScheme.primaryContainer,
-                            child: Text(
-                              '${day.dayNumber}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: day.isRestDay
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .onSecondaryContainer
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            day.isRestDay
-                                ? 'Rest Day'
-                                : (workout?.name ?? 'Select Workout'),
-                            style: TextStyle(
-                              fontStyle: day.isRestDay || workout == null
-                                  ? FontStyle.italic
-                                  : FontStyle.normal,
-                            ),
-                          ),
-                          subtitle: Text('Day ${day.dayNumber}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _editDay(
-                                  context,
-                                  rotationProvider,
-                                  day,
-                                  workouts,
-                                ),
-                              ),
-                              ReorderableDragStartListener(
-                                index: index,
-                                child: const Icon(Icons.drag_handle),
-                              ),
-                            ],
-                          ),
-                          onTap: () => _editDay(
-                            context,
-                            rotationProvider,
-                            day,
-                            workouts,
-                          ),
+                      return RotationDayGridBox(
+                        dayNumber: day.dayNumber,
+                        isRestDay: day.isRestDay,
+                        workoutName: workout?.name,
+                        isCurrent:
+                            day.dayNumber == rotationProvider.currentDay,
+                        onTap: () => _editDay(
+                          context,
+                          rotationProvider,
+                          day,
+                          workouts,
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
           );
         },
       ),
-      floatingActionButton: Consumer2<RotationProvider, WorkoutProvider>(
-        builder: (context, rotationProvider, workoutProvider, child) {
-          return FloatingActionButton.extended(
-            onPressed: () =>
-                _addDay(context, rotationProvider, workoutProvider.workouts),
-            icon: const Icon(Icons.add),
-            label: const Text('Add Day'),
-          );
-        },
-      ),
     );
   }
 
-  Future<void> _addDay(
-    BuildContext context,
-    RotationProvider rotationProvider,
-    List<Workout> workouts,
-  ) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) => RotationDayDialog(
-        dayNumber: rotationProvider.rotationDays.length + 1,
-        workouts: workouts,
-      ),
-    );
-
-    if (result != null) {
-      await rotationProvider.addRotationDay(
-        workoutId: result['workoutId'] as String?,
-        isRestDay: result['isRestDay'] as bool,
-      );
-      setState(() => _hasChanges = true);
-    }
-  }
 
   Future<void> _editDay(
     BuildContext context,
@@ -275,46 +338,6 @@ class _RotationSetupScreenState extends State<RotationSetupScreen> {
     }
   }
 
-  Future<bool> _confirmDelete(BuildContext context, RotationDay day) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Day'),
-        content: Text('Are you sure you want to delete Day ${day.dayNumber}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
-  Future<void> _deleteDay(
-    BuildContext context,
-    RotationProvider rotationProvider,
-    String dayId,
-  ) async {
-    await rotationProvider.deleteRotationDay(dayId);
-    setState(() => _hasChanges = true);
-  }
-
-  Future<void> _reorderDays(
-    BuildContext context,
-    RotationProvider rotationProvider,
-    int oldIndex,
-    int newIndex,
-  ) async {
-    await rotationProvider.reorderDays(oldIndex, newIndex);
-    setState(() => _hasChanges = true);
-  }
 
   void _saveAndExit() {
     ScaffoldMessenger.of(context).showSnackBar(

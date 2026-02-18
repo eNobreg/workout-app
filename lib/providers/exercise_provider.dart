@@ -41,6 +41,9 @@ class ExerciseProvider extends ChangeNotifier {
   Future<Exercise> createExercise({
     required String name,
     String? notes,
+    required int defaultSets,
+    required int defaultReps,
+    required double defaultWeight,
   }) async {
     if (_currentProfileId == null) {
       throw StateError('No profile selected');
@@ -50,6 +53,9 @@ class ExerciseProvider extends ChangeNotifier {
       _currentProfileId!,
       name,
       notes: notes,
+      defaultSets: defaultSets,
+      defaultReps: defaultReps,
+      defaultWeight: defaultWeight,
     );
 
     _exercises.add(exercise);

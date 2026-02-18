@@ -4,6 +4,7 @@ export 'exercise.dart';
 export 'workout.dart';
 export 'workout_exercise.dart';
 export 'rotation_schedule.dart';
+export 'rotation_progress.dart';
 export 'workout_session.dart';
 export 'session_set.dart';
 export 'quick_workout_template.dart';

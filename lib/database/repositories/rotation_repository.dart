@@ -74,6 +74,21 @@ class RotationRepository {
     await _db.deleteRotationSchedule(scheduleId);
   }
 
+  /// Gets rotation progress for a profile.
+  Future<RotationProgress?> getRotationProgress(String profileId) async {
+    return await _db.getRotationProgress(profileId);
+  }
+
+  /// Inserts or updates rotation progress for a profile.
+  Future<void> upsertRotationProgress(RotationProgress progress) async {
+    await _db.upsertRotationProgress(progress);
+  }
+
+  /// Deletes rotation progress for a profile.
+  Future<void> deleteRotationProgress(String profileId) async {
+    await _db.deleteRotationProgress(profileId);
+  }
+
   /// Gets the rotation length for a user's active schedule.
   Future<int> getRotationLength(String userId) async {
     final schedule = await _db.getActiveRotationSchedule(userId);

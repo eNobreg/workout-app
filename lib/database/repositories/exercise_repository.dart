@@ -13,13 +13,22 @@ class ExerciseRepository {
   }
 
   /// Creates a new exercise for a user.
-  Future<Exercise> createExercise(String userId, String name,
-      {String? notes}) async {
+  Future<Exercise> createExercise(
+    String userId,
+    String name, {
+    String? notes,
+    required int defaultSets,
+    required int defaultReps,
+    required double defaultWeight,
+  }) async {
     final exercise = Exercise(
       id: _uuid.v4(),
       profileId: userId,
       name: name,
       notes: notes,
+      defaultSets: defaultSets,
+      defaultReps: defaultReps,
+      defaultWeight: defaultWeight,
       createdAt: DateTime.now(),
     );
     await _db.insertExercise(exercise);

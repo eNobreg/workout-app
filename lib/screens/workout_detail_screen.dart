@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
+import '../utils/validators.dart';
 
 /// Screen for viewing and editing a workout template.
 class WorkoutDetailScreen extends StatefulWidget {
@@ -411,6 +412,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             await workoutProvider.addExerciseToWorkout(
               workoutId: widget.workoutId,
               exerciseId: exercise.id,
+              defaultSets: exercise.defaultSets,
+              defaultReps: exercise.defaultReps,
+              defaultWeight: exercise.defaultWeight,
             );
             if (mounted) {
               Navigator.of(context).pop();
@@ -426,46 +430,120 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Future<void> _showCreateExerciseDialog() async {
+    final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
+    final setsController = TextEditingController(text: '3');
+    final repsController = TextEditingController(text: '10');
+    final weightController = TextEditingController(text: '0');
 
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Create Exercise'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Exercise Name',
-            hintText: 'e.g., Bench Press, Squat',
+    Map<String, dynamic>? result;
+    try {
+      result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Create Exercise'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Exercise Name',
+                    hintText: 'e.g., Bench Press, Squat',
+                  ),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  validator: (value) =>
+                      validateName(value, fieldName: 'Exercise name'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: setsController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Sets',
+                  ),
+                  validator: (value) => validateSets(value),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: repsController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Reps',
+                  ),
+                  validator: (value) => validateReps(value),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: weightController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Weight',
+                    suffixText: 'lbs',
+                  ),
+                  validator: (value) => validateWeight(value),
+                ),
+              ],
+            ),
           ),
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  final name = nameController.text.trim();
+                  final defaultSets = int.tryParse(setsController.text.trim()) ?? 3;
+                  final defaultReps = int.tryParse(repsController.text.trim()) ?? 10;
+                  final defaultWeight =
+                      double.tryParse(weightController.text.trim()) ?? 0;
+
+                  Navigator.pop(dialogContext, {
+                    'name': name,
+                    'defaultSets': defaultSets,
+                    'defaultReps': defaultReps,
+                    'defaultWeight': defaultWeight,
+                  });
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, nameController.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      nameController.dispose();
+      setsController.dispose();
+      repsController.dispose();
+      weightController.dispose();
+    }
 
-    if (name != null && name.isNotEmpty && mounted) {
+    if (result != null && mounted) {
       final exerciseProvider = context.read<ExerciseProvider>();
-      final exercise = await exerciseProvider.createExercise(name: name);
+      final workoutProvider = context.read<WorkoutProvider>();
 
-      // Add the new exercise to the workout
-      if (mounted) {
-        await context.read<WorkoutProvider>().addExerciseToWorkout(
-              workoutId: widget.workoutId,
-              exerciseId: exercise.id,
-            );
-      }
+      final exercise = await exerciseProvider.createExercise(
+        name: result['name'] as String,
+        defaultSets: result['defaultSets'] as int? ?? 3,
+        defaultReps: result['defaultReps'] as int? ?? 10,
+        defaultWeight: result['defaultWeight'] as double? ?? 0,
+      );
+
+      if (!mounted) return;
+
+      await workoutProvider.addExerciseToWorkout(
+        workoutId: widget.workoutId,
+        exerciseId: exercise.id,
+        defaultSets: result['defaultSets'] as int? ?? 3,
+        defaultReps: result['defaultReps'] as int? ?? 10,
+        defaultWeight: result['defaultWeight'] as double? ?? 0,
+      );
     }
   }
 }

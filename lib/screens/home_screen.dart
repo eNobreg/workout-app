@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
+import '../models/models.dart';
 import '../providers/providers.dart';
-import 'workout_detail_screen.dart';
+import '../utils/validators.dart';
+import '../widgets/widgets.dart';
 import 'active_workout_screen.dart';
 import 'rotation_setup_screen.dart';
 import 'workout_history_screen.dart';
 import 'session_details_screen.dart';
 import 'exercise_history_screen.dart';
 import 'profile_screen.dart';
+import 'workout_detail_screen.dart';
 
 /// Main home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
@@ -37,10 +40,49 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_getTitle()),
         actions: [
+          // Rotation indicator in app bar
+          if (_currentIndex == 0)
+            Consumer<RotationProvider>(
+              builder: (context, rotationProvider, child) {
+                final rotationLength = rotationProvider.rotationLength;
+                if (rotationLength == 0) {
+                  return IconButton(
+                    icon: const Icon(Icons.rotate_right),
+                    onPressed: () => _navigateToRotationSetup(context),
+                    tooltip: 'Set Up Rotation',
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () => _navigateToRotationSetup(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          'Day ${rotationProvider.currentDay}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+          ),
           IconButton(
             icon: const Icon(Icons.person),
-            onPressed: _switchProfile,
-            tooltip: 'Switch Profile',
+            onPressed: _navigateToProfile,
+            tooltip: 'Profile',
           ),
         ],
       ),
@@ -49,8 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: const [
           _TodayTab(),
           _WorkoutsTab(),
+          _ExercisesTab(),
           _HistoryTab(),
-          _ProfileTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -72,16 +114,32 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Workouts',
           ),
           NavigationDestination(
+            icon: Icon(Icons.list_outlined),
+            selectedIcon: Icon(Icons.list),
+            label: 'Exercises',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'History',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
         ],
+      ),
+    );
+  }
+
+  void _navigateToRotationSetup(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const RotationSetupScreen(),
+      ),
+    );
+  }
+
+  void _navigateToProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(),
       ),
     );
   }
@@ -93,64 +151,11 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return 'Workouts';
       case 2:
-        return 'History';
+        return 'Exercises';
       case 3:
-        return 'Profile';
+        return 'History';
       default:
         return 'Workout Tracker';
-    }
-  }
-
-  Future<void> _switchProfile() async {
-    // Show loading indicator
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: SizedBox(
-          height: 100,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ),
-    );
-
-    try {
-      // Clear current data sequentially
-      context.read<ExerciseProvider>().clear();
-      if (!mounted) return;
-      
-      context.read<WorkoutProvider>().clear();
-      if (!mounted) return;
-      
-      context.read<SessionProvider>().clear();
-      if (!mounted) return;
-      
-      context.read<RotationProvider>().clear();
-      if (!mounted) return;
-      
-      context.read<HistoryProvider>().clear();
-      if (!mounted) return;
-      
-      await context.read<ProfileProvider>().setActiveProfile(null);
-      if (!mounted) return;
-
-      // Close loading dialog
-      Navigator.of(context).pop();
-      if (!mounted) return;
-      
-      Navigator.of(context).pushReplacementNamed(Routes.profileSelection);
-    } catch (e) {
-      // Close loading dialog on error
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error switching profile: $e')),
-        );
-      }
     }
   }
 }
@@ -171,20 +176,8 @@ class _TodayTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome message
-          Text(
-            'Hello, ${profile?.name ?? 'User'}!',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _getGreeting(),
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 24),
-
-          // Rotation display
-          _buildRotationCard(context, rotationProvider, workoutProvider),
+          // Today's Workout card
+          _buildTodaysWorkoutCard(context, rotationProvider, workoutProvider),
           const SizedBox(height: 16),
 
           // Active session card
@@ -355,7 +348,8 @@ class _TodayTab extends StatelessWidget {
     }
   }
 
-  Widget _buildRotationCard(
+
+  Widget _buildTodaysWorkoutCard(
     BuildContext context,
     RotationProvider rotationProvider,
     WorkoutProvider workoutProvider,
@@ -363,82 +357,59 @@ class _TodayTab extends StatelessWidget {
     final currentDay = rotationProvider.currentRotationDay;
     final rotationLength = rotationProvider.rotationLength;
 
-    // No rotation set up
-    if (rotationLength == 0) {
-      return Card(
-        child: ListTile(
-          leading: const Icon(Icons.rotate_right),
-          title: const Text('Set Up Rotation'),
-          subtitle: const Text('Create a workout cycle (e.g., Push/Pull/Legs)'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _navigateToRotationSetup(context),
-        ),
-      );
+    // No rotation or no current day
+    if (rotationLength == 0 || currentDay == null) {
+      return const SizedBox.shrink();
     }
 
-    // Rotation is set up - show current day
-    final workout = currentDay?.workoutId != null
+    final workout = currentDay.workoutId != null
         ? workoutProvider.workouts
-            .where((w) => w.id == currentDay!.workoutId)
+            .where((w) => w.id == currentDay.workoutId)
             .firstOrNull
         : null;
 
-    final dayLabel = currentDay?.isRestDay == true
+    final dayLabel = currentDay.isRestDay
         ? 'Rest Day'
         : (workout?.name ?? 'Workout Day');
 
     return Card(
-      color: currentDay?.isRestDay == true
+      color: currentDay.isRestDay
           ? Theme.of(context).colorScheme.secondaryContainer
           : Theme.of(context).colorScheme.primaryContainer,
-      child: InkWell(
-        onTap: () => _navigateToRotationSetup(context),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                child: Text(
-                  '${rotationProvider.currentDay}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+              Text(
+                "Today's Workout",
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                dayLabel,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (!currentDay.isRestDay && workout != null) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _startWorkout(context, workout),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Start Workout'),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Day ${rotationProvider.currentDay}: $dayLabel',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      '$rotationLength-day rotation cycle',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.edit_outlined),
+              ],
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _navigateToRotationSetup(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const RotationSetupScreen(),
       ),
     );
   }
@@ -472,7 +443,7 @@ class _TodayTab extends StatelessWidget {
 
   Future<void> _startQuickWorkoutFromTemplate(
     BuildContext context,
-    QuickWorkoutTemplate template,
+    dynamic template,
   ) async {
     final sessionProvider = context.read<SessionProvider>();
     final exerciseProvider = context.read<ExerciseProvider>();
@@ -671,46 +642,61 @@ class _ExercisesTab extends StatelessWidget {
             itemCount: exercises.length,
             itemBuilder: (context, index) {
               final exercise = exercises[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.fitness_center),
-                  title: Text(exercise.name),
-                  subtitle:
-                      exercise.notes != null ? Text(exercise.notes!) : null,
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'history') {
-                        _navigateToExerciseHistory(context, exercise);
-                      } else if (value == 'delete') {
-                        _confirmDeleteExercise(context, exercise);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'history',
-                        child: Row(
-                          children: [
-                            Icon(Icons.show_chart),
-                            SizedBox(width: 8),
-                            Text('View History'),
-                          ],
-                        ),
+
+              return Dismissible(
+                key: ValueKey(exercise.id),
+                direction: DismissDirection.startToEnd, // swipe right to delete
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.onError,
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete',
-                                style: TextStyle(color: Colors.red)),
-                          ],
+                      const SizedBox(width: 8),
+                      Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onError,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                  onTap: () => _navigateToExerciseHistory(context, exercise),
+                ),
+                confirmDismiss: (_) => _confirmDeleteExercise(context, exercise),
+                onDismissed: (_) {},
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.fitness_center),
+                    title: Text(exercise.name),
+                    subtitle: exercise.notes != null ? Text(exercise.notes!) : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.show_chart),
+                          tooltip: 'History',
+                          onPressed: () =>
+                              _navigateToExerciseHistory(context, exercise),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Edit',
+                          onPressed: () => _showEditExerciseDialog(context, exercise),
+                        ),
+                      ],
+                    ),
+                    onTap: () => _navigateToExerciseHistory(context, exercise),
+                  ),
                 ),
               );
             },
@@ -726,62 +712,53 @@ class _ExercisesTab extends StatelessWidget {
   }
 
   Future<void> _showCreateExerciseDialog(BuildContext context) async {
-    final nameController = TextEditingController();
-    final notesController = TextEditingController();
-
-    final result = await showDialog<Map<String, String>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Create Exercise'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Exercise Name',
-                hintText: 'e.g., Bench Press, Squat',
-              ),
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'e.g., Use wide grip',
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isNotEmpty) {
-                Navigator.pop(dialogContext, {
-                  'name': name,
-                  'notes': notesController.text.trim(),
-                });
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
+      builder: (_) => const _ExerciseFormDialog(
+        title: 'Create Exercise',
+        confirmText: 'Create',
       ),
     );
 
     if (result != null && context.mounted) {
       final exerciseProvider = context.read<ExerciseProvider>();
       await exerciseProvider.createExercise(
-        name: result['name']!,
-        notes: result['notes']!.isNotEmpty ? result['notes'] : null,
+        name: result['name'] as String,
+        notes: (result['notes'] as String).isNotEmpty
+            ? result['notes'] as String
+            : null,
+        defaultSets: result['defaultSets'] as int,
+        defaultReps: result['defaultReps'] as int,
+        defaultWeight: result['defaultWeight'] as double,
+      );
+    }
+  }
+
+  Future<void> _showEditExerciseDialog(
+    BuildContext context,
+    Exercise exercise,
+  ) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _ExerciseFormDialog(
+        title: 'Edit Exercise',
+        confirmText: 'Save',
+        initialExercise: exercise,
+      ),
+    );
+
+    if (result != null && context.mounted) {
+      final exerciseProvider = context.read<ExerciseProvider>();
+      await exerciseProvider.updateExercise(
+        exercise.copyWith(
+          name: result['name'] as String,
+          notes: (result['notes'] as String).isNotEmpty
+              ? result['notes'] as String
+              : null,
+          defaultSets: result['defaultSets'] as int,
+          defaultReps: result['defaultReps'] as int,
+          defaultWeight: result['defaultWeight'] as double,
+        ),
       );
     }
   }
@@ -794,8 +771,10 @@ class _ExercisesTab extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDeleteExercise(
-      BuildContext context, dynamic exercise) async {
+  Future<bool> _confirmDeleteExercise(
+    BuildContext context,
+    Exercise exercise,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -816,8 +795,152 @@ class _ExercisesTab extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      await context.read<ExerciseProvider>().deleteExercise(exercise.id);
+      try {
+        await context.read<ExerciseProvider>().deleteExercise(exercise.id);
+        return true;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete exercise: $e')),
+          );
+        }
+        return false;
+      }
     }
+
+    return false;
+  }
+}
+
+class _ExerciseFormDialog extends StatefulWidget {
+  final String title;
+  final String confirmText;
+  final Exercise? initialExercise;
+
+  const _ExerciseFormDialog({
+    required this.title,
+    required this.confirmText,
+    this.initialExercise,
+  });
+
+  @override
+  State<_ExerciseFormDialog> createState() => _ExerciseFormDialogState();
+}
+
+class _ExerciseFormDialogState extends State<_ExerciseFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _nameController;
+  late final TextEditingController _notesController;
+  late final TextEditingController _setsController;
+  late final TextEditingController _repsController;
+  late final TextEditingController _weightController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final ex = widget.initialExercise;
+
+    _nameController = TextEditingController(text: ex?.name ?? '');
+    _notesController = TextEditingController(text: ex?.notes ?? '');
+    _setsController =
+        TextEditingController(text: '${ex?.defaultSets ?? 3}');
+    _repsController =
+        TextEditingController(text: '${ex?.defaultReps ?? 10}');
+    _weightController =
+        TextEditingController(text: '${ex?.defaultWeight ?? 0}');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _notesController.dispose();
+    _setsController.dispose();
+    _repsController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    Navigator.of(context).pop({
+      'name': _nameController.text.trim(),
+      'notes': _notesController.text.trim(),
+      'defaultSets': int.tryParse(_setsController.text.trim()) ?? 3,
+      'defaultReps': int.tryParse(_repsController.text.trim()) ?? 10,
+      'defaultWeight': double.tryParse(_weightController.text.trim()) ?? 0,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Exercise Name',
+                hintText: 'e.g., Bench Press, Squat',
+              ),
+              autofocus: widget.initialExercise == null,
+              textCapitalization: TextCapitalization.words,
+              validator: (value) =>
+                  validateName(value, fieldName: 'Exercise name'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _setsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Default Sets'),
+              validator: (value) => validateSets(value),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _repsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Default Reps'),
+              validator: (value) => validateReps(value),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _weightController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Default Weight',
+                suffixText: 'lbs',
+              ),
+              validator: (value) => validateWeight(value),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                hintText: 'e.g., Use wide grip',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: Text(widget.confirmText),
+        ),
+      ],
+    );
   }
 }
 
@@ -833,12 +956,14 @@ class _HistoryTabState extends State<_HistoryTab> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadHistory();
+    });
   }
 
   Future<void> _loadHistory() async {
     final profileId = context.read<ProfileProvider>().activeProfile?.id;
-    if (profileId != null) {
+    if (profileId != null && mounted) {
       await context.read<HistoryProvider>().loadAllSessions(profileId);
     }
   }
@@ -971,13 +1096,3 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 }
 
-/// Profile tab - embedded profile screen.
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    // Return the ProfileScreen content without app bar
-    return const ProfileScreen(showAppBar: false);
-  }
-}

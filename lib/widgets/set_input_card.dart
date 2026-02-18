@@ -64,8 +64,8 @@ class _SetInputCardState extends State<SetInputCard> {
       return 'Enter weight';
     }
     final weight = double.tryParse(value);
-    if (weight == null || weight <= 0) {
-      return 'Weight must be > 0';
+    if (weight == null || weight < 0) {
+      return 'Weight cannot be negative';
     }
     return null;
   }

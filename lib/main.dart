@@ -37,21 +37,26 @@ class WorkoutTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RotationProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
         ChangeNotifierProvider(create: (_) => TemplateProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
-        title: 'Workout Tracker',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        initialRoute: Routes.profileSelection,
-        routes: {
-          Routes.profileSelection: (_) => const ProfileSelectionScreen(),
-          Routes.home: (_) => const HomeScreen(),
-          Routes.profile: (_) => const ProfileScreen(),
-          Routes.activeWorkout: (_) => const ActiveWorkoutScreen(),
-          Routes.rotationSetup: (_) => const RotationSetupScreen(),
-          Routes.workoutHistory: (_) => const WorkoutHistoryScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Workout Tracker',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeProvider.themeMode,
+            initialRoute: Routes.profileSelection,
+            routes: {
+              Routes.profileSelection: (_) => const ProfileSelectionScreen(),
+              Routes.home: (_) => const HomeScreen(),
+              Routes.profile: (_) => const ProfileScreen(),
+              Routes.activeWorkout: (_) => const ActiveWorkoutScreen(),
+              Routes.rotationSetup: (_) => const RotationSetupScreen(),
+              Routes.workoutHistory: (_) => const WorkoutHistoryScreen(),
+            },
+          );
         },
       ),
     );

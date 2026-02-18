@@ -15,6 +15,9 @@ class ActiveWorkoutScreen extends StatefulWidget {
 }
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
+  bool _isClosingSession = false;
+  bool _didAutoNavigateForMissingSession = false;
+
   @override
   Widget build(BuildContext context) {
     final sessionProvider = context.watch<SessionProvider>();
@@ -24,10 +27,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final session = sessionProvider.activeSession;
 
     if (session == null) {
-      // No active session, go back
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pop();
-      });
+      // During finish/cancel we intentionally clear activeSession before navigating.
+      // Avoid triggering an additional pop from build() which can leave the app on a
+      // blank route.
+      if (_isClosingSession) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Defensive: if this screen is opened with no active session, navigate back
+      // once after the first frame.
+      if (!_didAutoNavigateForMissingSession) {
+        _didAutoNavigateForMissingSession = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).maybePop();
+        });
+      }
+
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -190,7 +208,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
                     return ExerciseLogCard(
                       exercise: exercise,
-                      defaultSets: 3, // Default for quick workouts
+                      defaultSets: exercise.defaultSets,
                       loggedSets: sets,
                       onAddSet: (weight, reps) => _addSet(
                         sessionProvider,
@@ -238,6 +256,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     ExerciseProvider exerciseProvider,
   ) async {
     final exercises = exerciseProvider.exercises;
+    final sessionProvider = context.read<SessionProvider>();
 
     await showModalBottomSheet(
       context: context,
@@ -362,7 +381,18 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
 
     if (confirmed == true && mounted) {
+      final workoutId = sessionProvider.activeSession?.workoutId;
+
+      setState(() => _isClosingSession = true);
       await sessionProvider.endSession();
+
+      // If this workout corresponds to the current rotation day, advance rotation.
+      if (workoutId != null && mounted) {
+        await context
+            .read<RotationProvider>()
+            .completeCurrentDayForWorkout(workoutId: workoutId);
+      }
+
       if (mounted) {
         // Use maybePop to safely return; if we can't pop (no prior route),
         // fallback to replacing with home to prevent black screen
@@ -402,6 +432,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
 
     if (confirmed == true && mounted) {
+      setState(() => _isClosingSession = true);
       final session = sessionProvider.activeSession;
       if (session != null) {
         await sessionProvider.deleteSession(session.id);

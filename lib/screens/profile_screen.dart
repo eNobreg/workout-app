@@ -381,6 +381,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
+              // Appearance section
+              Text(
+                'Appearance',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Consumer<ThemeProvider>(
+                builder: (context, themeProvider, child) {
+                  return Card(
+                    child: Column(
+                      children: [
+                        RadioListTile<ThemeMode>(
+                          title: const Text('Light Mode'),
+                          subtitle: const Text('Use light theme'),
+                          value: ThemeMode.light,
+                          groupValue: themeProvider.themeMode,
+                          onChanged: (value) {
+                            if (value != null) {
+                              themeProvider.setThemeMode(value);
+                            }
+                          },
+                          secondary: const Icon(Icons.light_mode),
+                        ),
+                        const Divider(height: 1),
+                        RadioListTile<ThemeMode>(
+                          title: const Text('Dark Mode'),
+                          subtitle: const Text('Use dark theme'),
+                          value: ThemeMode.dark,
+                          groupValue: themeProvider.themeMode,
+                          onChanged: (value) {
+                            if (value != null) {
+                              themeProvider.setThemeMode(value);
+                            }
+                          },
+                          secondary: const Icon(Icons.dark_mode),
+                        ),
+                        const Divider(height: 1),
+                        RadioListTile<ThemeMode>(
+                          title: const Text('System Default'),
+                          subtitle: const Text('Follow system theme'),
+                          value: ThemeMode.system,
+                          groupValue: themeProvider.themeMode,
+                          onChanged: (value) {
+                            if (value != null) {
+                              themeProvider.setThemeMode(value);
+                            }
+                          },
+                          secondary: const Icon(Icons.settings_suggest),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+
               // Account section
               Text(
                 'Account',
@@ -502,8 +560,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
 
     if (widget.showAppBar) {
       return Scaffold(
