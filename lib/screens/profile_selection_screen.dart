@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../main.dart';
 import '../providers/providers.dart';
 import '../models/models.dart';
-import 'home_screen.dart';
 
 /// Screen for selecting or creating a user profile.
 class ProfileSelectionScreen extends StatefulWidget {
@@ -43,9 +43,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
     await sessionProvider.loadSessions(profile.id);
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(context).pushReplacementNamed(Routes.home);
   }
 
   Future<void> _createProfile() async {
