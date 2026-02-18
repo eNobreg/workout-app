@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
 import '../providers/providers.dart';
+import 'workout_detail_screen.dart';
 
 /// Main home screen with bottom navigation.
 class HomeScreen extends StatefulWidget {
@@ -276,64 +277,117 @@ class _WorkoutsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<WorkoutProvider>(
-      builder: (context, workoutProvider, child) {
-        if (workoutProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Scaffold(
+      body: Consumer<WorkoutProvider>(
+        builder: (context, workoutProvider, child) {
+          if (workoutProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final workouts = workoutProvider.workouts;
+          final workouts = workoutProvider.workouts;
 
-        if (workouts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.fitness_center,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: 16),
-                const Text('No workouts yet'),
-                const SizedBox(height: 8),
-                const Text('Create workout templates like "Push Day"'),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Create workout dialog
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Workout'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: workouts.length,
-          itemBuilder: (context, index) {
-            final workout = workouts[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.fitness_center),
-                title: Text(workout.name),
-                subtitle: workout.description != null
-                    ? Text(workout.description!)
-                    : null,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Navigate to workout detail
-                },
+          if (workouts.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.fitness_center,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('No workouts yet'),
+                  const SizedBox(height: 8),
+                  const Text('Create workout templates like "Push Day"'),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _showCreateWorkoutDialog(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create Workout'),
+                  ),
+                ],
               ),
             );
-          },
-        );
-      },
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: workouts.length,
+            itemBuilder: (context, index) {
+              final workout = workouts[index];
+              final exerciseCount =
+                  workoutProvider.getWorkoutExercises(workout.id).length;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.fitness_center),
+                  title: Text(workout.name),
+                  subtitle: Text(
+                    '$exerciseCount exercise${exerciseCount == 1 ? '' : 's'}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _navigateToWorkoutDetail(context, workout.id),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateWorkoutDialog(context),
+        child: const Icon(Icons.add),
+      ),
     );
+  }
+
+  void _navigateToWorkoutDetail(BuildContext context, String workoutId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+      ),
+    );
+  }
+
+  Future<void> _showCreateWorkoutDialog(BuildContext context) async {
+    final nameController = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create Workout'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Workout Name',
+            hintText: 'e.g., Push Day, Leg Day',
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, nameController.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (name != null && name.isNotEmpty && context.mounted) {
+      final workoutProvider = context.read<WorkoutProvider>();
+      final workout = await workoutProvider.createWorkout(name: name);
+
+      if (context.mounted) {
+        _navigateToWorkoutDetail(context, workout.id);
+      }
+    }
   }
 }
 
@@ -343,61 +397,169 @@ class _ExercisesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ExerciseProvider>(
-      builder: (context, exerciseProvider, child) {
-        if (exerciseProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Scaffold(
+      body: Consumer<ExerciseProvider>(
+        builder: (context, exerciseProvider, child) {
+          if (exerciseProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final exercises = exerciseProvider.exercises;
+          final exercises = exerciseProvider.exercises;
 
-        if (exercises.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.list,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: 16),
-                const Text('No exercises yet'),
-                const SizedBox(height: 8),
-                const Text('Create your custom exercises'),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Create exercise dialog
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Exercise'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: exercises.length,
-          itemBuilder: (context, index) {
-            final exercise = exercises[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(exercise.name),
-                subtitle: exercise.notes != null ? Text(exercise.notes!) : null,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: Navigate to exercise detail/history
-                },
+          if (exercises.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.list,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('No exercises yet'),
+                  const SizedBox(height: 8),
+                  const Text('Create your custom exercises'),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _showCreateExerciseDialog(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Exercise'),
+                  ),
+                ],
               ),
             );
-          },
-        );
-      },
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: exercises.length,
+            itemBuilder: (context, index) {
+              final exercise = exercises[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  title: Text(exercise.name),
+                  subtitle:
+                      exercise.notes != null ? Text(exercise.notes!) : null,
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _confirmDeleteExercise(context, exercise);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete',
+                                style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateExerciseDialog(context),
+        child: const Icon(Icons.add),
+      ),
     );
+  }
+
+  Future<void> _showCreateExerciseDialog(BuildContext context) async {
+    final nameController = TextEditingController();
+    final notesController = TextEditingController();
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create Exercise'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Exercise Name',
+                hintText: 'e.g., Bench Press, Squat',
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                hintText: 'e.g., Use wide grip',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(dialogContext, {
+                  'name': name,
+                  'notes': notesController.text.trim(),
+                });
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && context.mounted) {
+      final exerciseProvider = context.read<ExerciseProvider>();
+      await exerciseProvider.createExercise(
+        name: result['name']!,
+        notes: result['notes']!.isNotEmpty ? result['notes'] : null,
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteExercise(
+      BuildContext context, dynamic exercise) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Exercise'),
+        content: Text('Are you sure you want to delete "${exercise.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<ExerciseProvider>().deleteExercise(exercise.id);
+    }
   }
 }
 

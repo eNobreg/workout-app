@@ -1,20 +1,22 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 import '../models/models.dart';
-import '../services/database_service.dart';
+import '../database/repositories/repositories.dart';
 
 /// Provider for managing workouts and workout exercises.
 class WorkoutProvider extends ChangeNotifier {
-  final DatabaseService _db = DatabaseService.instance;
-  final Uuid _uuid = const Uuid();
+  final WorkoutRepository _repository = WorkoutRepository();
 
   List<Workout> _workouts = [];
   Map<String, List<WorkoutExercise>> _workoutExercises = {};
+  Workout? _selectedWorkout;
   bool _isLoading = false;
   String? _currentProfileId;
 
   /// All workouts for the current profile.
   List<Workout> get workouts => _workouts;
+
+  /// The currently selected workout.
+  Workout? get selectedWorkout => _selectedWorkout;
 
   /// Whether the provider is loading data.
   bool get isLoading => _isLoading;
@@ -26,13 +28,13 @@ class WorkoutProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _workouts = await _db.getWorkouts(profileId);
+      _workouts = await _repository.loadWorkoutsByUser(profileId);
       _workoutExercises = {};
 
       // Load exercises for each workout
       for (final workout in _workouts) {
         _workoutExercises[workout.id] =
-            await _db.getWorkoutExercises(workout.id);
+            await _repository.getWorkoutExercises(workout.id);
       }
     } finally {
       _isLoading = false;
@@ -49,16 +51,12 @@ class WorkoutProvider extends ChangeNotifier {
       throw StateError('No profile selected');
     }
 
-    final workout = Workout(
-      id: _uuid.v4(),
-      profileId: _currentProfileId!,
-      name: name,
+    final workout = await _repository.createWorkout(
+      _currentProfileId!,
+      name,
       description: description,
-      sortOrder: _workouts.length,
-      createdAt: DateTime.now(),
     );
 
-    await _db.insertWorkout(workout);
     _workouts.add(workout);
     _workoutExercises[workout.id] = [];
     notifyListeners();
@@ -68,19 +66,35 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Updates an existing workout.
   Future<void> updateWorkout(Workout workout) async {
-    await _db.updateWorkout(workout);
+    await _repository.updateWorkout(workout);
     final index = _workouts.indexWhere((w) => w.id == workout.id);
     if (index != -1) {
       _workouts[index] = workout;
+      if (_selectedWorkout?.id == workout.id) {
+        _selectedWorkout = workout;
+      }
       notifyListeners();
     }
   }
 
   /// Deletes a workout.
   Future<void> deleteWorkout(String id) async {
-    await _db.deleteWorkout(id);
+    await _repository.deleteWorkout(id);
     _workouts.removeWhere((w) => w.id == id);
     _workoutExercises.remove(id);
+    if (_selectedWorkout?.id == id) {
+      _selectedWorkout = null;
+    }
+    notifyListeners();
+  }
+
+  /// Selects a workout by ID.
+  void selectWorkout(String? id) {
+    if (id == null) {
+      _selectedWorkout = null;
+    } else {
+      _selectedWorkout = getWorkout(id);
+    }
     notifyListeners();
   }
 
@@ -108,17 +122,14 @@ class WorkoutProvider extends ChangeNotifier {
   }) async {
     final exercises = _workoutExercises[workoutId] ?? [];
 
-    final workoutExercise = WorkoutExercise(
-      id: _uuid.v4(),
+    final workoutExercise = await _repository.addExerciseToWorkout(
       workoutId: workoutId,
       exerciseId: exerciseId,
-      sortOrder: exercises.length,
       defaultSets: defaultSets,
       defaultReps: defaultReps,
       defaultWeight: defaultWeight,
     );
 
-    await _db.insertWorkoutExercise(workoutExercise);
     _workoutExercises[workoutId] = [...exercises, workoutExercise];
     notifyListeners();
 
@@ -127,7 +138,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Updates a workout exercise.
   Future<void> updateWorkoutExercise(WorkoutExercise workoutExercise) async {
-    await _db.updateWorkoutExercise(workoutExercise);
+    await _repository.updateWorkoutExercise(workoutExercise);
     final exercises = _workoutExercises[workoutExercise.workoutId];
     if (exercises != null) {
       final index = exercises.indexWhere((e) => e.id == workoutExercise.id);
@@ -141,7 +152,7 @@ class WorkoutProvider extends ChangeNotifier {
   /// Removes an exercise from a workout.
   Future<void> removeExerciseFromWorkout(
       String workoutId, String workoutExerciseId) async {
-    await _db.deleteWorkoutExercise(workoutExerciseId);
+    await _repository.removeExerciseFromWorkout(workoutExerciseId);
     final exercises = _workoutExercises[workoutId];
     if (exercises != null) {
       exercises.removeWhere((e) => e.id == workoutExerciseId);
@@ -166,9 +177,9 @@ class WorkoutProvider extends ChangeNotifier {
     for (var i = 0; i < exercises.length; i++) {
       final updated = exercises[i].copyWith(sortOrder: i);
       exercises[i] = updated;
-      await _db.updateWorkoutExercise(updated);
     }
 
+    await _repository.updateExerciseOrder(workoutId, exercises);
     notifyListeners();
   }
 
@@ -176,6 +187,7 @@ class WorkoutProvider extends ChangeNotifier {
   void clear() {
     _workouts = [];
     _workoutExercises = {};
+    _selectedWorkout = null;
     _currentProfileId = null;
     notifyListeners();
   }
