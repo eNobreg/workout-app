@@ -176,6 +176,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
         builder: (context, profileProvider, child) {
           if (profileProvider.profiles.isEmpty) return const SizedBox.shrink();
           return FloatingActionButton(
+            heroTag: 'createProfileFab',
             onPressed: _createProfile,
             child: const Icon(Icons.add),
           );

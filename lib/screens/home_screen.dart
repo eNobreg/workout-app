@@ -336,6 +336,7 @@ class _WorkoutsTab extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'createWorkoutFab',
         onPressed: () => _showCreateWorkoutDialog(context),
         child: const Icon(Icons.add),
       ),
@@ -469,6 +470,7 @@ class _ExercisesTab extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'createExerciseFab',
         onPressed: () => _showCreateExerciseDialog(context),
         child: const Icon(Icons.add),
       ),

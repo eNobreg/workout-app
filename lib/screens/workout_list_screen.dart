@@ -72,6 +72,7 @@ class WorkoutListScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'workoutListCreateFab',
         onPressed: () => _showCreateWorkoutDialog(context),
         child: const Icon(Icons.add),
       ),

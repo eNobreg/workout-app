@@ -136,6 +136,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
+            heroTag: 'addExerciseToWorkoutFab',
             onPressed: () => _showAddExerciseDialog(exerciseProvider),
             icon: const Icon(Icons.add),
             label: const Text('Add Exercise'),
