@@ -4,6 +4,12 @@ import 'app_theme.dart';
 import 'providers/providers.dart';
 import 'screens/screens.dart';
 
+/// Named routes for navigation.
+class Routes {
+  static const String profileSelection = '/';
+  static const String home = '/home';
+}
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const WorkoutTrackerApp());
@@ -28,7 +34,11 @@ class WorkoutTrackerApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        home: const ProfileSelectionScreen(),
+        initialRoute: Routes.profileSelection,
+        routes: {
+          Routes.profileSelection: (_) => const ProfileSelectionScreen(),
+          Routes.home: (_) => const HomeScreen(),
+        },
       ),
     );
   }

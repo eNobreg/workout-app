@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../main.dart';
 import '../providers/providers.dart';
-import 'profile_selection_screen.dart';
 import 'workout_detail_screen.dart';
 
 /// Main home screen with bottom navigation.
@@ -22,9 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (profile == null) {
       // If no profile is selected, redirect to profile selection
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ProfileSelectionScreen()),
-        );
+        Navigator.of(context).pushReplacementNamed(Routes.profileSelection);
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -105,9 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await context.read<ProfileProvider>().setActiveProfile(null);
 
     if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ProfileSelectionScreen()),
-      );
+      Navigator.of(context).pushReplacementNamed(Routes.profileSelection);
     }
   }
 }
