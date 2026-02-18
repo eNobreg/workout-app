@@ -250,6 +250,38 @@ class _TodayTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
+          // Quick Workout Templates section
+          Consumer<TemplateProvider>(
+            builder: (context, templateProvider, child) {
+              final templates = templateProvider.templates;
+
+              if (templates.isNotEmpty) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Saved Templates',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    ...templates.take(3).map((template) => Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: const Icon(Icons.bookmark),
+                            title: Text(template.name),
+                            subtitle: Text('${template.items.length} exercise${template.items.length == 1 ? '' : 's'}'),
+                            trailing: const Icon(Icons.play_arrow),
+                            onTap: () => _startQuickWorkoutFromTemplate(context, template),
+                          ),
+                        )),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+
           // Workouts section
           Consumer<WorkoutProvider>(
             builder: (context, workoutProvider, child) {
@@ -428,6 +460,40 @@ class _TodayTab extends StatelessWidget {
       workoutId: workout.id,
       workoutName: workout.name,
     );
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const ActiveWorkoutScreen(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _startQuickWorkoutFromTemplate(
+    BuildContext context,
+    QuickWorkoutTemplate template,
+  ) async {
+    final sessionProvider = context.read<SessionProvider>();
+    final exerciseProvider = context.read<ExerciseProvider>();
+
+    // Start a new quick workout session
+    await sessionProvider.startSession();
+    if (!context.mounted) return;
+
+    // Add exercises from the template
+    for (final item in template.items) {
+      final exercise = exerciseProvider.getExercise(item.exerciseId);
+      if (exercise != null) {
+        await sessionProvider.logSet(
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+          setNumber: 1,
+          weight: 0.0,
+          reps: 0,
+        );
+      }
+    }
+
     if (context.mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(

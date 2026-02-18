@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../main.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
 import '../widgets/exercise_log_card.dart';
@@ -80,12 +81,29 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: ElevatedButton(
-            onPressed: () => _confirmFinishWorkout(context),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 56),
-            ),
-            child: const Text('Finish Workout'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 12,
+            children: [
+              // Save as Template button (only for quick workouts)
+              if (session.workoutId == null && context.read<SessionProvider>().activeSets.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => _showSaveTemplateDialog(context),
+                  icon: const Icon(Icons.save),
+                  label: const Text('Save as Template'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+              // Finish Workout button
+              ElevatedButton(
+                onPressed: () => _confirmFinishWorkout(context),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 56),
+                ),
+                child: const Text('Finish Workout'),
+              ),
+            ],
           ),
         ),
       ),
@@ -396,6 +414,72 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           Navigator.of(context).pushReplacementNamed(Routes.home);
         }
       }
+    }
+  }
+
+  Future<void> _showSaveTemplateDialog(BuildContext context) async {
+    final templateNameController = TextEditingController();
+
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save as Template'),
+        content: TextField(
+          controller: templateNameController,
+          decoration: const InputDecoration(
+            labelText: 'Template Name',
+            hintText: 'e.g., My Favorite Workout',
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave == true && mounted) {
+      final templateName = templateNameController.text.trim();
+      if (templateName.isNotEmpty) {
+        try {
+          final sessionProvider = context.read<SessionProvider>();
+          final exerciseProvider = context.read<ExerciseProvider>();
+          final templateProvider = context.read<TemplateProvider>();
+
+          // Get unique exercise IDs from active sets
+          final exerciseIds = sessionProvider.activeSets
+              .map((set) => set.exerciseId)
+              .toSet()
+              .toList();
+
+          // Save the template
+          await templateProvider.createTemplate(
+            name: templateName,
+            exerciseIds: exerciseIds,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Template saved successfully')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error saving template: $e')),
+            );
+          }
+        }
+      }
+      templateNameController.dispose();
     }
   }
 

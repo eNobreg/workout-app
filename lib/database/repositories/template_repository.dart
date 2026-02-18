@@ -10,26 +10,14 @@ class TemplateRepository {
 
   /// Loads all templates for a profile.
   Future<List<QuickWorkoutTemplate>> loadTemplatesByUser(String profileId) async {
-    final templateMaps = await _db.query(
-      'quick_workout_templates',
-      where: 'profileId = ?',
-      whereArgs: [profileId],
-      orderBy: 'createdAt DESC',
-    );
-    return templateMaps.map((map) => QuickWorkoutTemplate.fromMap(map)).toList();
+    final templateMaps = await _db.getQuickWorkoutTemplates(profileId);
+    return templateMaps;
   }
 
   /// Gets a template by ID.
   Future<QuickWorkoutTemplate?> getTemplate(String templateId) async {
-    final result = await _db.query(
-      'quick_workout_templates',
-      where: 'id = ?',
-      whereArgs: [templateId],
-      limit: 1,
-    );
-    
-    if (result.isEmpty) return null;
-    return QuickWorkoutTemplate.fromMap(result.first);
+    final result = await _db.getQuickWorkoutTemplate(templateId);
+    return result;
   }
 
   /// Creates a new template from a list of exercise IDs.
@@ -52,38 +40,19 @@ class TemplateRepository {
       createdAt: DateTime.now(),
     );
 
-    await _db.insert('quick_workout_templates', {
-      'id': template.id,
-      'profileId': template.profileId,
-      'name': template.name,
-      'exerciseIds': jsonEncode(exerciseIds),
-      'createdAt': template.createdAt.toIso8601String(),
-    });
-
+    await _db.insertQuickWorkoutTemplate(template, exerciseIds);
     return template;
   }
 
   /// Updates a template.
   Future<void> updateTemplate(QuickWorkoutTemplate template) async {
     final exerciseIds = template.items.map((item) => item.exerciseId).toList();
-    await _db.update(
-      'quick_workout_templates',
-      {
-        'name': template.name,
-        'exerciseIds': jsonEncode(exerciseIds),
-      },
-      where: 'id = ?',
-      whereArgs: [template.id],
-    );
+    await _db.updateQuickWorkoutTemplate(template, exerciseIds);
   }
 
   /// Deletes a template.
   Future<void> deleteTemplate(String templateId) async {
-    await _db.delete(
-      'quick_workout_templates',
-      where: 'id = ?',
-      whereArgs: [templateId],
-    );
+    await _db.deleteQuickWorkoutTemplate(templateId);
   }
 
   /// Gets exercise IDs from a template.

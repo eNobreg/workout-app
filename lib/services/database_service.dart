@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
 import '../models/models.dart';
 
 /// Database service for the workout tracker app.
@@ -575,6 +576,75 @@ class DatabaseService {
   Future<void> deleteSessionSet(String id) async {
     final db = await database;
     await db.delete('session_sets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ============== Quick Workout Template Operations ==============
+
+  /// Gets all templates for a profile.
+  Future<List<QuickWorkoutTemplate>> getQuickWorkoutTemplates(String profileId) async {
+    final db = await database;
+    final maps = await db.query(
+      'quick_workout_templates',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      orderBy: 'created_at DESC',
+    );
+    return maps.map((map) => QuickWorkoutTemplate.fromMap(map)).toList();
+  }
+
+  /// Gets a template by ID.
+  Future<QuickWorkoutTemplate?> getQuickWorkoutTemplate(String templateId) async {
+    final db = await database;
+    final maps = await db.query(
+      'quick_workout_templates',
+      where: 'id = ?',
+      whereArgs: [templateId],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return QuickWorkoutTemplate.fromMap(maps.first);
+  }
+
+  /// Inserts a new template.
+  Future<void> insertQuickWorkoutTemplate(
+    QuickWorkoutTemplate template,
+    List<String> exerciseIds,
+  ) async {
+    final db = await database;
+    await db.insert('quick_workout_templates', {
+      'id': template.id,
+      'profile_id': template.profileId,
+      'name': template.name,
+      'exercise_ids': jsonEncode(exerciseIds),
+      'created_at': template.createdAt.toIso8601String(),
+    });
+  }
+
+  /// Updates a template.
+  Future<void> updateQuickWorkoutTemplate(
+    QuickWorkoutTemplate template,
+    List<String> exerciseIds,
+  ) async {
+    final db = await database;
+    await db.update(
+      'quick_workout_templates',
+      {
+        'name': template.name,
+        'exercise_ids': jsonEncode(exerciseIds),
+      },
+      where: 'id = ?',
+      whereArgs: [template.id],
+    );
+  }
+
+  /// Deletes a template.
+  Future<void> deleteQuickWorkoutTemplate(String templateId) async {
+    final db = await database;
+    await db.delete(
+      'quick_workout_templates',
+      where: 'id = ?',
+      whereArgs: [templateId],
+    );
   }
 
   // ============== Utility Operations ==============
