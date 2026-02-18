@@ -417,6 +417,41 @@ class DatabaseService {
     await db.delete('rotation_schedules', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Inserts a rotation day.
+  Future<void> insertRotationDay(RotationDay day) async {
+    final db = await database;
+    await db.insert('rotation_days', day.toMap());
+  }
+
+  /// Updates a rotation day.
+  Future<void> updateRotationDay(RotationDay day) async {
+    final db = await database;
+    await db.update(
+      'rotation_days',
+      day.toMap(),
+      where: 'id = ?',
+      whereArgs: [day.id],
+    );
+  }
+
+  /// Deletes a rotation day.
+  Future<void> deleteRotationDay(String id) async {
+    final db = await database;
+    await db.delete('rotation_days', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Gets all rotation days for a schedule.
+  Future<List<RotationDay>> getRotationDays(String scheduleId) async {
+    final db = await database;
+    final maps = await db.query(
+      'rotation_days',
+      where: 'schedule_id = ?',
+      whereArgs: [scheduleId],
+      orderBy: 'day_number ASC',
+    );
+    return maps.map((map) => RotationDay.fromMap(map)).toList();
+  }
+
   // ============== Workout Session Operations ==============
 
   /// Inserts a workout session.

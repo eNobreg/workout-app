@@ -33,6 +33,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
     final exerciseProvider = context.read<ExerciseProvider>();
     final workoutProvider = context.read<WorkoutProvider>();
     final sessionProvider = context.read<SessionProvider>();
+    final rotationProvider = context.read<RotationProvider>();
 
     await exerciseProvider.loadExercises(profile.id);
     if (!mounted) return;
@@ -41,6 +42,9 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
     if (!mounted) return;
 
     await sessionProvider.loadSessions(profile.id);
+    if (!mounted) return;
+
+    await rotationProvider.loadRotation(profile.id);
     if (!mounted) return;
 
     Navigator.of(context).pushReplacementNamed(Routes.home);
