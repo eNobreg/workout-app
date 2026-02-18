@@ -194,11 +194,37 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             subtitle: Text(
               '${workoutExercise.defaultSets} sets${workoutExercise.defaultReps != null ? ' × ${workoutExercise.defaultReps} reps' : ''}',
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.remove_circle_outline),
-              color: Theme.of(context).colorScheme.error,
-              onPressed: () => _confirmRemoveExercise(workoutExercise, exerciseName),
-              tooltip: 'Remove from workout',
+            onTap: () => _showEditExerciseDefaults(workoutExercise, workoutProvider),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _showEditExerciseDefaults(workoutExercise, workoutProvider);
+                } else if (value == 'remove') {
+                  _confirmRemoveExercise(workoutExercise, exerciseName);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit),
+                      SizedBox(width: 8),
+                      Text('Edit Defaults'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'remove',
+                  child: Row(
+                    children: [
+                      Icon(Icons.remove_circle_outline, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Text('Remove', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -249,6 +275,84 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       if (mounted) {
         Navigator.of(context).pop();
       }
+    }
+  }
+
+  Future<void> _showEditExerciseDefaults(
+    WorkoutExercise workoutExercise,
+    WorkoutProvider workoutProvider,
+  ) async {
+    final setsController = TextEditingController(text: '${workoutExercise.defaultSets}');
+    final repsController = TextEditingController(
+      text: workoutExercise.defaultReps?.toString() ?? '',
+    );
+    final weightController = TextEditingController(
+      text: workoutExercise.defaultWeight?.toString() ?? '',
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Exercise Defaults'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: setsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Default Sets',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: repsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Default Reps (optional)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: weightController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Default Weight (optional)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final defaultSets = int.tryParse(setsController.text) ?? 3;
+      final defaultReps =
+          repsController.text.isNotEmpty ? int.tryParse(repsController.text) : null;
+      final defaultWeight = weightController.text.isNotEmpty
+          ? double.tryParse(weightController.text)
+          : null;
+
+      final updated = workoutExercise.copyWith(
+        defaultSets: defaultSets,
+        defaultReps: defaultReps,
+        defaultWeight: defaultWeight,
+      );
+
+      await workoutProvider.updateWorkoutExercise(updated);
+      setsController.dispose();
+      repsController.dispose();
+      weightController.dispose();
     }
   }
 

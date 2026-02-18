@@ -100,16 +100,56 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _switchProfile() async {
-    // Clear current data
-    context.read<ExerciseProvider>().clear();
-    context.read<WorkoutProvider>().clear();
-    context.read<SessionProvider>().clear();
-    context.read<RotationProvider>().clear();
-    await context.read<ProfileProvider>().setActiveProfile(null);
+  Future<void> _switchProfile() async {
+    // Show loading indicator
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: SizedBox(
+          height: 100,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    );
 
-    if (mounted) {
+    try {
+      // Clear current data sequentially
+      context.read<ExerciseProvider>().clear();
+      if (!mounted) return;
+      
+      context.read<WorkoutProvider>().clear();
+      if (!mounted) return;
+      
+      context.read<SessionProvider>().clear();
+      if (!mounted) return;
+      
+      context.read<RotationProvider>().clear();
+      if (!mounted) return;
+      
+      context.read<HistoryProvider>().clear();
+      if (!mounted) return;
+      
+      await context.read<ProfileProvider>().setActiveProfile(null);
+      if (!mounted) return;
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+      if (!mounted) return;
+      
       Navigator.of(context).pushReplacementNamed(Routes.profileSelection);
+    } catch (e) {
+      // Close loading dialog on error
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error switching profile: $e')),
+        );
+      }
     }
   }
 }

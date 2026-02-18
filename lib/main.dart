@@ -35,6 +35,7 @@ class WorkoutTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SessionProvider()),
         ChangeNotifierProvider(create: (_) => RotationProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
+        ChangeNotifierProvider(create: (_) => TemplateProvider()),
       ],
       child: MaterialApp(
         title: 'Workout Tracker',

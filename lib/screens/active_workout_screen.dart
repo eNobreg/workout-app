@@ -270,10 +270,16 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ],
         ),
       ),
-    ).then((exercise) {
-      if (exercise != null && exercise is Exercise) {
-        // The exercise is now available for adding sets
-        // The UI will update when a set is added
+    ).then((exercise) async {
+      if (exercise != null && exercise is Exercise && mounted) {
+        // Auto-add first set placeholder so exercise appears immediately
+        await _addSet(
+          sessionProvider,
+          exercise,
+          1,
+          0.0,  // Default empty weight
+          0,    // Default empty reps
+        );
       }
     });
   }
@@ -340,7 +346,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (confirmed == true && mounted) {
       await sessionProvider.endSession();
       if (mounted) {
-        Navigator.of(context).pop();
+        // Use maybePop to safely return; if we can't pop (no prior route),
+        // fallback to replacing with home to prevent black screen
+        final didPop = Navigator.of(context).maybePop();
+        if (!await didPop && mounted) {
+          Navigator.of(context).pushReplacementNamed(Routes.home);
+        }
       }
     }
   }
@@ -378,7 +389,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         await sessionProvider.deleteSession(session.id);
       }
       if (mounted) {
-        Navigator.of(context).pop();
+        // Use maybePop to safely return; if we can't pop (no prior route),
+        // fallback to replacing with home to prevent black screen
+        final didPop = Navigator.of(context).maybePop();
+        if (!await didPop && mounted) {
+          Navigator.of(context).pushReplacementNamed(Routes.home);
+        }
       }
     }
   }

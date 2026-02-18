@@ -149,6 +149,18 @@ class DatabaseService {
       )
     ''');
 
+    // Quick workout templates table
+    await db.execute('''
+      CREATE TABLE quick_workout_templates (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        exerciseIds TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+      )
+    ''');
+
     // Create indexes for better query performance
     await db.execute(
         'CREATE INDEX idx_exercises_profile ON exercises (profile_id)');
@@ -168,6 +180,8 @@ class DatabaseService {
         'CREATE INDEX idx_session_sets_session ON session_sets (session_id)');
     await db.execute(
         'CREATE INDEX idx_session_sets_exercise ON session_sets (exercise_id)');
+    await db.execute(
+        'CREATE INDEX idx_quick_workout_templates_profile ON quick_workout_templates (profile_id)');
   }
 
   /// Handles database upgrades.
